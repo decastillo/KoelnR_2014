@@ -1,0 +1,3 @@
+library("RSQLite")
+RSQLite:::.test()
+

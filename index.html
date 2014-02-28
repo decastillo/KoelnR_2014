@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>R und Datenbanken</title>
+  <meta charset="utf-8">
+  <meta name="description" content="R und Datenbanken">
+  <meta name="author" content="Diego de Castillo">
+  <meta name="generator" content="slidify" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/default.css" media="all" >
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/phone.css" 
+    media="only screen and (max-device-width: 480px)" >
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/slidify.css" >
+  <link rel="stylesheet" href="libraries/highlighters/highlight.js/css/tomorrow.css" />
+  <base target="_blank"> <!-- This amazingness opens all links in a new tab. -->  <link rel=stylesheet href="./assets/css/ribbons.css"></link>
+
+  
+  <!-- Grab CDN jQuery, fall back to local if offline -->
+  <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.7.min.js"></script>
+  <script>window.jQuery || document.write('<script src="libraries/widgets/quiz/js/jquery.js"><\/script>')</script> 
+  <script data-main="libraries/frameworks/io2012/js/slides" 
+    src="libraries/frameworks/io2012/js/require-1.0.8.min.js">
+  </script>
+  
+  
+
+</head>
+<body style="opacity: 0">
+  <slides class="layout-widescreen">
+    
+    <!-- LOGO SLIDE -->
+        <slide class="title-slide segue nobackground">
+  <hgroup class="auto-fadein">
+    <h1>R und Datenbanken</h1>
+    <h2>sqlite, postgresql und oracle</h2>
+    <p>Diego de Castillo<br/>Oracle DBA, IT Data Management, NetCologne</p>
+  </hgroup>
+    <a href="https://github.com/decastillo/KoelnR2014/zipball/gh-pages" class="example">
+     Download
+    </a>
+  <article></article>  
+</slide>
+    
+
+    <!-- SLIDES -->
+    <slide class="" id="slide-1" style="background:;">
+  <article data-timings="">
+    <!--
+ich arbeite als Oracle DBA, d.h. Datenbank-Administrator.
+hier werde ich aber nicht nur über oracle-datenbanken sprechen, sondern auch
+über sqlite und postgresql sowie generische Datenbank-Verbindungen wie JDBC und OdBC. 
+Es geht also hier meistens
+um relationale Datenbanken. Diese weisen üblicherweise eine bestimmte Datenstruktur
+und Vorhaltung auf.
+
+Neben der reinen Verbindung und Abholung der Daten möchte ich auch auf
+Performance und die ausführungsdauer von verschiedenen methoden eingehen.
+und wie die man Split-apply-combine-Ansätze, die Bernd bei seinem letzten
+Vortrag vorgestellt hat, einbinden kann. Das wird notwendig wenn man die
+Daten in der datenbank hat oder sie wegen der größe der daten nicht am stück
+in den arbeitsspeicher laden kann.
+
+Die Folien sind mit slidify erzeugt, das ist ein R-Package zur Erzeugung
+von html5 Präsentationen aus einfachen Markdown-Dateien mit R Markdown (knitr) mit eingebettetem
+R-Code. Wir werden heute also recht viel R-Code in meinem Vortrag zu sehen bekommen.
+
+zu indizierung: Nadel im Heuhaufen finden, darin sind Datenbanken gut 
+ohne medienbruch: daten da abholen, wo sie eh vorliegen.
+In relationalen Datenbanken versteht man unter Konsistenz die Integrität von Daten.
+-->
+
+<h2>Warum überhaupt Datenbanken?</h2>
+
+<ul class = "build incremental">
+<li>DBs sind typenkonform; Number, Character, Date, BLOB u.v.m.</li>
+<li>Indizierter Zugriff auf selektive Daten</li>
+<li>kein Medienbruch</li>
+<li>Unterstützt parallele zeitgleiche Zugriffe (Mehrbenutzerzugriffe)</li>
+<li>Konsistenzsicherheit / Datenintegrität</li>
+<li>Vereinfachtes Verknüpfen von Daten  (Joins)</li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-2" style="background:;">
+  <hgroup>
+    <h2>Beispielsdatensatz : utils und data.table</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">system.time({
+    df &lt;- read.csv(&quot;data/p1.csv&quot;, sep = &quot;;&quot;)
+})
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+## 177.662   2.764 181.012
+</code></pre>
+
+<pre><code class="r">system.time({
+    df2 &lt;- fread(&quot;data/p1.csv&quot;)
+})
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##   4.519   0.274   5.747
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-3" style="background:;">
+  <hgroup>
+    <h2>Beispielsdatensatz : Mengengerüst</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">dim(df)
+</code></pre>
+
+<pre><code>## [1] 1000000      29
+</code></pre>
+
+<pre><code class="r">paste(round(file.info(&quot;data/p1.csv&quot;)$size/1024/1024), &quot;Mb&quot;)
+</code></pre>
+
+<pre><code>## [1] &quot;306 Mb&quot;
+</code></pre>
+
+<pre><code class="r">print(object.size(df), units = &quot;auto&quot;)
+</code></pre>
+
+<pre><code>## 408.8 Mb
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-4" style="background:;">
+  <article data-timings="">
+    <!--
+ hier sieht man die nachteile bei fehlendem typen-konzept und medienbruch.
+ In der CSV-Datei steht in der Spalte revision_tag ...;"SiebelUpdateFlow";"1.0";... 
+-->
+
+<h2>Beispielsdatensatz : nicht typenkonform</h2>
+
+<pre><code class="r">str(df$revision_tag)
+str(df2$revision_tag)
+</code></pre>
+
+<pre><code>##  num [1:1000000] 1 1 1 1 1 1 1 1 1 1 ...
+</code></pre>
+
+<pre><code>##  chr [1:1000000] &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; ...
+</code></pre>
+
+<!-- html table generated in R 3.0.2 by xtable 1.7-1 package -->
+
+<!-- Tue Feb 25 20:28:54 2014 -->
+
+<TABLE border=1>
+<TR> <TH>  </TH> <TH> cikey </TH> <TH> process_id </TH> <TH> status </TH> <TH> root_id </TH> <TH> modify_date </TH> <TH> revision_tag </TH>  </TR>
+  <TR> <TD align="right"> 1 </TD> <TD align="right"> 124640243 </TD> <TD> ExternalActivityFlow </TD> <TD> Scope_FindOrder </TD> <TD align="right"> 124640242 </TD> <TD> 01.09.2013 00:01:36,228000 </TD> <TD align="right"> 1.00 </TD> </TR>
+  <TR> <TD align="right"> 2 </TD> <TD align="right"> 124640256 </TD> <TD> SiebelUpdateFlow </TD> <TD> Update </TD> <TD align="right"> 124640105 </TD> <TD> 01.09.2013 00:02:10,070000 </TD> <TD align="right"> 1.00 </TD> </TR>
+  <TR> <TD align="right"> 3 </TD> <TD align="right"> 124640269 </TD> <TD> SiebelActivityFlow </TD> <TD> initiated </TD> <TD align="right"> 124640257 </TD> <TD> 01.09.2013 00:20:41,144000 </TD> <TD align="right"> 1.00 </TD> </TR>
+   </TABLE>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-5" style="background:;">
+  <article data-timings="">
+    <!--
+ Datenbanken sehr weit gefasster Begriff.
+ ist nicht cutting edge, aber immer noch mit Berechtigung dabei,
+ je nach Anforderungen.
+
+Außerdem gibt es generische Datenbankzugriffe über odbc und jdbc
+
+ odbc ist ohne dbi, der rest schon.
+ DBI ist S4-Klasse für vereinheitlichten Zugriff:
+-->
+
+<h2>Also nehmen wir Datenbanken!</h2>
+
+<p>Mit Datenbanken sind hier relationale Datenbanksysteme gemeint. Hier betrachten wir:</p>
+
+<ul>
+<li>Oracle</li>
+<li>PostgreSQL</li>
+<li>SQLite</li>
+</ul>
+
+<p>Generische Pakete, die für viele Datenbank-Typen passen, sind:</p>
+
+<ul>
+<li>ODBC</li>
+<li>JDBC</li>
+</ul>
+
+<p>Für einen vereinheitlichten Zugriff dient S4-Bibliothek:</p>
+
+<ul>
+<li>DBI </li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-6" style="background:;">
+  <article data-timings="">
+    <!--
+ The interface defines a small set of classes and methods similar 
+ in spirit to Perl’s DBI, Java’s JDBC, Python’s DB-API, and Microsoft’s ODBC.
+-->
+
+<h2>DBI : library(DBI)</h2>
+
+<p>DBI ist eine generische S4-Bibliothek. Die Klassen und Methoden, die
+zur Verfügung stehen, können von einer Vielzahl von Datenbanksystemen genutzt werden.</p>
+
+<p>Klassen: </p>
+
+<ul>
+<li>DBIConnection</li>
+<li>DBIDriver</li>
+<li>DBIObject</li>
+<li>DBIResult<br></li>
+</ul>
+
+<p>Methoden: </p>
+
+<ul>
+<li>dbColumnInfo</li>
+<li>dbCommit</li>
+<li>dbConnect</li>
+<li>dbSendQuery</li>
+<li class = '..</li>
+</ul>
+
+ '></article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-7" style="background:;">
+  <hgroup>
+    <h2>Der erste Datenbankzugriff</h2>
+  </hgroup>
+  <article data-timings="">
+    <p>Dieser erfolgt bei einem lesenden Zugriff in 4 Schritten:</p>
+
+<ol class = "build incremental">
+<li>Laden und Initialisieren der zugehörigen Treiber: dbDriver()</li>
+<li>Die Verbindung herstellen: dbConnect()</li>
+<li>Die Anfrage senden: dbSendQuery(con, &quot;select * from p1&quot;)</li>
+<li>Die Daten holen: fetch(rs)</li>
+</ol>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-8" style="background:;">
+  <hgroup>
+    <h2>Oracle : library(ROracle)</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">library(ROracle)
+# laden und initialisieren
+drv &lt;- dbDriver(&quot;Oracle&quot;)
+# verbindung herstellen: con
+con &lt;- dbConnect(drv, username = &quot;diego&quot;, password = &quot;diego&quot;, dbname = &quot;ddc11&quot;)
+# anfrage senden, resultset: rs
+rs &lt;- dbSendQuery(con, &quot;select * from p1&quot;)
+# alle daten holen
+system.time({
+    data &lt;- fetch(rs, n = -1)
+})
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##  27.322   4.912  58.288
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-9" style="background:;">
+  <article data-timings="">
+    <!--
+Was ist jetzt aus unserem bspdatensatz geworden?
+In Tabelle so definiert <pre>"REVISION_TAG" VARCHAR2(50 BYTE)</pre>.
+-->
+
+<h2>Beispielsdatensatz : aus Datenbank-Tabelle</h2>
+
+<pre><code class="r">dim(data)
+str(data$REVISION_TAG)
+</code></pre>
+
+<pre><code>## [1] 1000000      29
+</code></pre>
+
+<pre><code>##  chr [1:1000000] &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; &quot;1.0&quot; ...
+</code></pre>
+
+<!-- html table generated in R 3.0.2 by xtable 1.7-1 package -->
+
+<!-- Tue Feb 25 20:30:27 2014 -->
+
+<TABLE border=1>
+<TR> <TH>  </TH> <TH> CIKEY </TH> <TH> PROCESS_ID </TH> <TH> STATUS </TH> <TH> ROOT_ID </TH> <TH> REVISION_TAG </TH>  </TR>
+  <TR> <TD align="right"> 1 </TD> <TD align="right"> 124640243.00 </TD> <TD> ExternalActivityFlow </TD> <TD> Scope_FindOrder </TD> <TD> 124640242 </TD> <TD> 1.0 </TD> </TR>
+  <TR> <TD align="right"> 2 </TD> <TD align="right"> 124640256.00 </TD> <TD> SiebelUpdateFlow </TD> <TD> Update </TD> <TD> 124640105 </TD> <TD> 1.0 </TD> </TR>
+  <TR> <TD align="right"> 3 </TD> <TD align="right"> 124640269.00 </TD> <TD> SiebelActivityFlow </TD> <TD> initiated </TD> <TD> 124640257 </TD> <TD> 1.0 </TD> </TR>
+   </TABLE>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-10" style="background:;">
+  <article data-timings="">
+    <!--
+dbDriver:
+These virtual classes and their methods define the interface to 
+database management systems (DBMS). They are extended by packages 
+or drivers that implement the methods in the context of specific DBMS
+(datenbank = databasemanagementsystem(dbms) + daten)
+(e.g., Berkeley DB, MySQL, Oracle, ODBC, PostgreSQL, SQLite).
+
+dbconnect:
+Connect to a DBMS going through the appropriate authorization procedure.
+-->
+
+<h2>PostgreSQL : library(RPostgreSQL)</h2>
+
+<pre><code class="r">library(RPostgreSQL)
+drv &lt;- dbDriver(&quot;PostgreSQL&quot;)
+# connect DBMS mittels passendem Berechtigungsverfahren
+con &lt;- dbConnect(drv, dbname = &quot;postgres&quot;, user = &quot;diego&quot;, password = &quot;diego&quot;, 
+    host = &quot;ocos&quot;)
+rs &lt;- dbSendQuery(con, &quot;select * from P1&quot;)
+system.time({
+    data &lt;- fetch(rs, n = -1)
+})
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##  190.69   36.82  237.09
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-11" style="background:;">
+  <hgroup>
+    <h2>SQLite : library(RSQLite)</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">library(RSQLite)
+drv &lt;- dbDriver(&quot;SQLite&quot;)
+con &lt;- dbConnect(drv, &quot;~/Google Drive/R/KoelnR-2014/data/sqlitedb.sqlite&quot;)
+rs &lt;- dbSendQuery(con, &quot;select * from P1&quot;)
+system.time({
+    data &lt;- fetch(rs, n = -1)
+})
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##   12.41    3.07   17.42
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-12" style="background:;">
+  <article data-timings="">
+    <!--
+JDBC function has two purposes. One is to initialize the Java VM and load a Java 
+JDBC driver (not to be confused with the JDBCDriver R object which is 
+actually a DBI driver). 
+The second purpose is to create a proxy R object which can be used to a call 
+dbConnect which actually creates a connection.
+JDBC requires a JDBC driver for a database-backend to be loaded. 
+Usually a JDBC driver is supplied in a Java Archive (jar) file. 
+The path to such a file can be specified in classPath. The driver itself has a 
+Java class name that is used to load the driver (for example the MySQL driver 
+uses com.mysql.jdbc.Driver), this has to be specified in driverClass.
+Due to the fact that JDBC can talk to a wide variety of databases, 
+the SQL dialect understood by the database is not known in advance. 
+Therefore the RJDBC implementation tries to adhere to the SQL92 standard, 
+but not all databases are compliant. This affects mainly functions such as 
+dbWriteTable that have to automatically generate SQL code.
+-->
+
+<h2>Java Database Connectivity : library(RJDBC)</h2>
+
+<p>JDBC ist eine einheitliche Schnittstelle zu verschiedenen Datenbanken. Es werden
+für jede Datenbank die zugehörigen JDBC-Treiber benötigt.</p>
+
+<pre><code class="r">library(DBI)
+library(rJava)
+library(RJDBC)
+drv &lt;- JDBC(&quot;org.sqlite.JDBC&quot;, &quot;~/Google Drive/R/KoelnR-2014/sqlite-jdbc-3.7.2.jar&quot;)
+con &lt;- dbConnect(drv, &quot;jdbc:sqlite:data/sqlitedb.sqlite&quot;)
+</code></pre>
+
+<pre><code class="r">rs &lt;- dbSendQuery(con, statement = &quot;SELECT * from P1&quot;)
+data &lt;- fetch(rs, n = 500)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-13" style="background:;">
+  <hgroup>
+    <h2>Open Database Connectivity : Konfiguration</h2>
+  </hgroup>
+  <article data-timings="">
+    <h3>odbc.ini</h3>
+
+<pre>
+[ODBC Data Sources]
+postgres = postgresql
+
+[postgres]
+Driver      = PostgreSQL
+ServerName   = ocos
+Port = 5432
+Database   = postgres
+UserName     = diego
+Password = diego
+Protocol = 9.2
+</pre>
+
+<h3>odbcinst.ini</h3>
+
+<pre>
+[PostgreSQL]
+Driver   = /usr/local/lib/psqlodbcw.so
+</pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-14" style="background:;">
+  <hgroup>
+    <h2>Open Database Connectivity : library(RODBC)</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r"># ohne DBI
+library(RODBC)
+odbcDataSources()
+</code></pre>
+
+<pre><code>##     postgres 
+## &quot;PostgreSQL&quot;
+</code></pre>
+
+<pre><code class="r">channel &lt;- odbcConnect(&quot;postgres&quot;)
+data &lt;- sqlQuery(channel, &quot;select * from p1 limit 500&quot;)
+dim(data)
+</code></pre>
+
+<pre><code>## [1] 500  29
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-15" style="background:;">
+  <hgroup>
+    <h2>Kürzer</h2>
+  </hgroup>
+  <article data-timings="">
+    <p>Um vollständig auf SQL zu verzichten, gibt es auch Funktionen,
+welche die entsprechenden Statements direkt eingebunden haben:</p>
+
+<pre><code class="r">rs &lt;- dbSendQuery(con, &quot;select * from P1&quot;)
+data &lt;- fetch(rs)
+</code></pre>
+
+<pre><code class="r">data &lt;- dbReadTable(con, &quot;P1&quot;)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-16" style="background:;">
+  <hgroup>
+    <h2>Cleanup : nach dem fetch()</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r"># löscht alle offenen Referenzen zu einem resultset
+dbClearResult(rs)
+# schließe connection
+dbDisconnect(con)
+# Treiber wird gelöscht
+dbUnloadDriver(drv)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-17" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform / split-apply-combine</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">system.time({
+    rb &lt;- do.call(&quot;rbind&quot;, lapply(split(df$scope_csize, df$process_id), sum))
+    rb.df &lt;- data.frame(process_id = rownames(rb), total = rb, row.names = NULL)
+    result &lt;- head(rb.df[order(rb.df$total, decreasing = T), ], 5)
+})
+result
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##   0.041   0.028   0.106
+</code></pre>
+
+<pre><code>##                   process_id     total
+## 83          SiebelUpdateFlow 308411993
+## 28        ExternalStatusFlow 161350929
+## 80 SiebelOrderItemUpdateFlow  70485121
+## 88            SyncModuleFlow  48834012
+## 89             SyncOrderFlow  45176379
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-18" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform : library(plyr)</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">gs &lt;- ddply(df, &quot;process_id&quot;, summarise, total = sum(scope_csize))
+result &lt;- head(arrange(gs, desc(total)), 5)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-19" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform : direkt via SQL</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">drv &lt;- dbDriver(&quot;Oracle&quot;)
+con &lt;- dbConnect(drv, username = &quot;diego&quot;, password = &quot;diego&quot;, dbname = &quot;ddc11&quot;)
+stmt &lt;- &quot;select process_id, sum(scope_csize) from p1 group by process_id order by 2 desc&quot;
+rs &lt;- dbSendQuery(con, stmt)
+system.time({
+    data &lt;- fetch(rs, n = 5)
+})
+data
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##   0.002   0.001   0.910
+</code></pre>
+
+<pre><code>##                  PROCESS_ID SUM(SCOPE_CSIZE)
+## 1          SiebelUpdateFlow        308411993
+## 2        ExternalStatusFlow        161350929
+## 3 SiebelOrderItemUpdateFlow         70485121
+## 4            SyncModuleFlow         48834012
+## 5             SyncOrderFlow         45176379
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-20" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform : library(dplyr)</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">library(dplyr)
+system.time({
+    processes &lt;- group_by(df, process_id)
+    gs &lt;- summarise(processes, total = sum(scope_csize))
+    result &lt;- arrange(gs, desc(total))
+})
+head(result, 5)
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##   0.055   0.033   0.122
+</code></pre>
+
+<pre><code>## Source: local data frame [5 x 2]
+## 
+##                  process_id     total
+## 1          SiebelUpdateFlow 308411993
+## 2        ExternalStatusFlow 161350929
+## 3 SiebelOrderItemUpdateFlow  70485121
+## 4            SyncModuleFlow  48834012
+## 5             SyncOrderFlow  45176379
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-21" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform : library(dplyr)</h2>
+  </hgroup>
+  <article data-timings="">
+    <p>Wenn die Datenmenge so groß ist, dass nicht alle Daten in den Speicher passen,
+kann man mit Teilmengen oder Aggregationen arbeiten.</p>
+
+<p>dplyr funktioniert transparent und arbeitet mit Datenbankzugriffen oder lokalen data.frames,
+die entsprechenden Funktionen sind die gleichen! Das generische Objekt dafür
+heißt tbl.</p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-22" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform : dplyr ist lazy</h2>
+  </hgroup>
+  <article data-timings="">
+    <p>dplyr versucht so lazy wie möglich zu sein:</p>
+
+<ol>
+<li>Es werden Daten nur nach R geholt, wenn man explizit danach fragt.</li>
+<li>Der Datenbankzugriff wird so lange wie möglich herausgezögert und
+erfolgt dann in einem Schritt.</li>
+</ol>
+
+<p>Es gibt 5 entscheidende Daten-Manipulationen in dplyr, diese
+werden bei Bedarf in SQL übersetzt und laufen dann auf der Datenbank:</p>
+
+<ul>
+<li>select</li>
+<li>filter</li>
+<li>arrange</li>
+<li>mutate</li>
+<li>summarise</li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-23" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform : library(dplyr)</h2>
+  </hgroup>
+  <article data-timings="">
+    <p>Zuerst wird ein Connect zu einer Datenbank aufgebaut. dplyr unterstützt im Moment
+postgres, mysql und sqlite.</p>
+
+<pre><code class="r">my_db &lt;- src_postgres(dbname = &quot;postgres&quot;, user = &quot;diego&quot;, password = &quot;diego&quot;, 
+    host = &quot;ocos&quot;)
+my_db
+</code></pre>
+
+<pre><code>## src:  postgres 8.4.18 [diego@ocos:5432/postgres]
+## tbls: cities, p1, test1, x_1000
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-24" style="background:;">
+  <hgroup>
+    <h2>dplyr-Objekt tbl aus Datenbank-Tabelle</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">data_db &lt;- tbl(my_db, sql(&quot;SELECT * FROM P1&quot;))
+data_db
+</code></pre>
+
+<pre><code>## Source: postgres 8.4.18 [diego@ocos:5432/postgres]
+## From: &lt;derived table&gt; [?? x 29]
+## 
+##        cikey domain_ref         process_id revision_tag
+## 1  124642631          0 ExternalStatusFlow          1.0
+## 2  124642639          0   SiebelUpdateFlow          1.0
+## 3  124642659          0   SiebelUpdateFlow          1.0
+## 4  124642663          0   SiebelUpdateFlow          1.0
+## 5  124642667          0      SyncOrderFlow          1.0
+## 6  124642678          0   SiebelUpdateFlow          1.0
+## 7  124642682          0   SiebelUpdateFlow          1.0
+## 8  124642685          0   SiebelUpdateFlow          1.0
+## 9  124642690          0      SyncOrderFlow          1.0
+## 10 124642695          0   ODSOrderSyncFlow          1.0
+## ..       ...        ...                ...          ...
+## Variables not shown: creation_date (time), creator (chr), modify_date
+##   (time), modifier (chr), state (int), priority (int), title (chr), status
+##   (chr), stage (chr), conversation_id (chr), root_id (chr), parent_id
+##   (chr), scope_revision (int), scope_csize (int), scope_usize (int),
+##   process_guid (chr), process_type (int), metadata (chr), ext_string1
+##   (chr), ext_string2 (chr), ext_int1 (int), test_run_id (chr), at_count_id
+##   (int), at_event_id (int), at_detail_id (int)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-25" style="background:;">
+  <hgroup>
+    <h2>load-extract-transform : tbl-Objekt data_db</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">system.time({
+    processesdb &lt;- group_by(data_db, process_id)
+    gsdb &lt;- summarise(processesdb, total = sum(scope_csize))
+    result &lt;- arrange(gsdb, desc(total))
+})
+</code></pre>
+
+<pre><code>##    user  system elapsed 
+##   0.050   0.003   0.053
+</code></pre>
+
+<pre><code class="r">head(collect(result), 5)
+</code></pre>
+
+<pre><code>## Source: local data frame [5 x 2]
+## 
+##                  process_id     total
+## 1          SiebelUpdateFlow 308411993
+## 2        ExternalStatusFlow 161350929
+## 3 SiebelOrderItemUpdateFlow  70485121
+## 4            SyncModuleFlow  48834012
+## 5             SyncOrderFlow  45176379
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-26" style="background:;">
+  <hgroup>
+    <h2>Ergebnisse in Datenbank speichern : PDF als BLOB</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">library(ggplot2)
+qp &lt;- qplot(y = process_id, x = total, data = head(collect(result), 5))
+ggsave(plot = qp, filename = &quot;qp.pdf&quot;)
+</code></pre>
+
+<pre><code>## Saving 7 x 7 in image
+</code></pre>
+
+<pre><code class="r">PICOBJ &lt;- paste(readBin(&quot;qp.pdf&quot;, &quot;raw&quot;, n = file.info(&quot;qp.pdf&quot;)$size), collapse = &quot;&quot;)
+qp
+</code></pre>
+
+<p><img src="assets/fig/unnamed-chunk-33.png" alt="plot of chunk unnamed-chunk-33"> </p>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-27" style="background:;">
+  <hgroup>
+    <h2>Zuerst eine Connection aufbauen</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">library(ROracle)
+drv &lt;- dbDriver(&quot;Oracle&quot;)
+con &lt;- dbConnect(drv, username = &quot;diego&quot;, password = &quot;diego&quot;, dbname = &quot;ddc11&quot;, 
+    prefetch = FALSE, bulk_read = 1000L, stmt_cache = 0L)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-28" style="background:;">
+  <hgroup>
+    <h2>INSERT mit dbGetQuery()</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">insStr &lt;- &quot;insert into plots values(:1, :2, utl_raw.cast_to_raw(:3))&quot;
+x &lt;- 1
+y &lt;- as.POSIXct(&quot;2014-02-22&quot;)
+z &lt;- &quot;Hierhin kommt das Bild&quot;
+df &lt;- data.frame(x, y, z)
+dbGetQuery(con, insStr, df)
+dbCommit(con)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-29" style="background:;">
+  <hgroup>
+    <h2>UPDATE via PL/SQL als RAW BLOB</h2>
+  </hgroup>
+  <article data-timings="">
+    <pre><code class="r">updateStr &lt;- paste0(&quot;DECLARE buf RAW(30000); BEGIN buf := &#39;&quot;, PICOBJ, &quot;&#39;;&quot;, 
+    &quot;UPDATE plots SET bin = buf WHERE id = 1; commit;END; &quot;)
+dbGetQuery(con, updateStr)
+</code></pre>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-30" style="background:;">
+  <hgroup>
+    <h2>Grafik ist in der Datenbank gespeichert</h2>
+  </hgroup>
+  <article data-timings="">
+    <div style='text-align: center;'>
+    <img height='548' src='data/snap2.png' />
+</div>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-31" style="background:;">
+  <article data-timings="">
+    <!--
+ Noch fragen oder anmerkunken
+-->
+
+<h2>Vielen Dank !!</h2>
+
+<h2>Q &amp; A</h2>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+    <slide class="backdrop"></slide>
+  </slides>
+  <div class="pagination pagination-small" id='io2012-ptoc' style="display:none;">
+    <ul>
+      <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=1 title=''>
+         1
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=2 title='Beispielsdatensatz : utils und data.table'>
+         2
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=3 title='Beispielsdatensatz : Mengengerüst'>
+         3
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=4 title=''>
+         4
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=5 title=''>
+         5
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=6 title=''>
+         6
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=7 title='Der erste Datenbankzugriff'>
+         7
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=8 title='Oracle : library(ROracle)'>
+         8
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=9 title=''>
+         9
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=10 title=''>
+         10
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=11 title='SQLite : library(RSQLite)'>
+         11
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=12 title=''>
+         12
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=13 title='Open Database Connectivity : Konfiguration'>
+         13
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=14 title='Open Database Connectivity : library(RODBC)'>
+         14
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=15 title='Kürzer'>
+         15
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=16 title='Cleanup : nach dem fetch()'>
+         16
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=17 title='load-extract-transform / split-apply-combine'>
+         17
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=18 title='load-extract-transform : library(plyr)'>
+         18
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=19 title='load-extract-transform : direkt via SQL'>
+         19
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=20 title='load-extract-transform : library(dplyr)'>
+         20
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=21 title='load-extract-transform : library(dplyr)'>
+         21
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=22 title='load-extract-transform : dplyr ist lazy'>
+         22
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=23 title='load-extract-transform : library(dplyr)'>
+         23
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=24 title='dplyr-Objekt tbl aus Datenbank-Tabelle'>
+         24
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=25 title='load-extract-transform : tbl-Objekt data_db'>
+         25
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=26 title='Ergebnisse in Datenbank speichern : PDF als BLOB'>
+         26
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=27 title='Zuerst eine Connection aufbauen'>
+         27
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=28 title='INSERT mit dbGetQuery()'>
+         28
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=29 title='UPDATE via PL/SQL als RAW BLOB'>
+         29
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=30 title='Grafik ist in der Datenbank gespeichert'>
+         30
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=31 title=''>
+         31
+      </a>
+    </li>
+  </ul>
+  </div>  <!--[if IE]>
+    <script 
+      src="http://ajax.googleapis.com/ajax/libs/chrome-frame/1/CFInstall.min.js">  
+    </script>
+    <script>CFInstall.check({mode: 'overlay'});</script>
+  <![endif]-->
+</body>
+  <!-- Load Javascripts for Widgets -->
+  
+  <!-- LOAD HIGHLIGHTER JS FILES -->
+  <script src="libraries/highlighters/highlight.js/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <!-- DONE LOADING HIGHLIGHTER JS FILES -->
+   
+  </html>

@@ -1,0 +1,14 @@
+.Rproj.user
+.Rhistory
+.RData
+.DS_Store
+.cache
+examples/
+makefile
+docs/
+NEWS*
+archive/
+data/
+sql/
+
+

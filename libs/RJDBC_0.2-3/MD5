@@ -1,0 +1,14 @@
+c827cd52a4f1de91a3a008837b2e4774 *DESCRIPTION
+bdd1c038a874d584f1364032ec8c4f40 *NAMESPACE
+e837833207fba45a8fc2b57aafa854aa *NEWS
+64e674c50ca30dc811c556c696a8e7c1 *R/class.R
+65fa014dbebe8a50f4cf3224e9c1f4af *inst/java/RJDBC.jar
+4309105f37d503973264940af42c725f *java-src/JDBCResultPull.java
+69c0595aa96d602bfc58b33b418011a2 *man/JDBC.Rd
+3bcb0fe521196a968eb27103478ed33f *man/JDBCConnection-class.Rd
+c5698ac0af30b45b30318ba66dce48c5 *man/JDBCConnection-methods.Rd
+66f707fd2b3241cd4ba4b1a62e619d9b *man/JDBCDriver-class.Rd
+0e67b15be54f83069f48a2e4fc866699 *man/JDBCDriver-methods.Rd
+fb5d09b09d34a6c591eb88a34c9f52d3 *man/JDBCResult-class.Rd
+20907465c96fe7cd1a3d8d91cc1dee09 *man/JDBCResult-methods.Rd
+9fcfa1434e60b6d189882a061a4b5ecb *test.sh
