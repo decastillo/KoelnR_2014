@@ -36,9 +36,7 @@
     <h2>sqlite, postgresql und oracle</h2>
     <p>Diego de Castillo<br/>Oracle DBA, IT Data Management, NetCologne</p>
   </hgroup>
-    <a href="https://github.com/decastillo/KoelnR2014/zipball/gh-pages" class="example">
-     Download
-    </a>
+  
   <article></article>  
 </slide>
     
@@ -46,29 +44,7 @@
     <!-- SLIDES -->
     <slide class="" id="slide-1" style="background:;">
   <article data-timings="">
-    <!--
-ich arbeite als Oracle DBA, d.h. Datenbank-Administrator.
-hier werde ich aber nicht nur über oracle-datenbanken sprechen, sondern auch
-über sqlite und postgresql sowie generische Datenbank-Verbindungen wie JDBC und OdBC. 
-Es geht also hier meistens
-um relationale Datenbanken. Diese weisen üblicherweise eine bestimmte Datenstruktur
-und Vorhaltung auf.
-
-Neben der reinen Verbindung und Abholung der Daten möchte ich auch auf
-Performance und die ausführungsdauer von verschiedenen methoden eingehen.
-und wie die man Split-apply-combine-Ansätze, die Bernd bei seinem letzten
-Vortrag vorgestellt hat, einbinden kann. Das wird notwendig wenn man die
-Daten in der datenbank hat oder sie wegen der größe der daten nicht am stück
-in den arbeitsspeicher laden kann.
-
-Die Folien sind mit slidify erzeugt, das ist ein R-Package zur Erzeugung
-von html5 Präsentationen aus einfachen Markdown-Dateien mit R Markdown (knitr) mit eingebettetem
-R-Code. Wir werden heute also recht viel R-Code in meinem Vortrag zu sehen bekommen.
-
-zu indizierung: Nadel im Heuhaufen finden, darin sind Datenbanken gut 
-ohne medienbruch: daten da abholen, wo sie eh vorliegen.
-In relationalen Datenbanken versteht man unter Konsistenz die Integrität von Daten.
--->
+  
 
 <h2>Warum überhaupt Datenbanken?</h2>
 
@@ -141,10 +117,7 @@ In relationalen Datenbanken versteht man unter Konsistenz die Integrität von Da
 
 <slide class="" id="slide-4" style="background:;">
   <article data-timings="">
-    <!--
- hier sieht man die nachteile bei fehlendem typen-konzept und medienbruch.
- In der CSV-Datei steht in der Spalte revision_tag ...;"SiebelUpdateFlow";"1.0";... 
--->
+   
 
 <h2>Beispielsdatensatz : nicht typenkonform</h2>
 
@@ -175,17 +148,7 @@ str(df2$revision_tag)
 
 <slide class="" id="slide-5" style="background:;">
   <article data-timings="">
-    <!--
- Datenbanken sehr weit gefasster Begriff.
- ist nicht cutting edge, aber immer noch mit Berechtigung dabei,
- je nach Anforderungen.
-
-Außerdem gibt es generische Datenbankzugriffe über odbc und jdbc
-
- odbc ist ohne dbi, der rest schon.
- DBI ist S4-Klasse für vereinheitlichten Zugriff:
--->
-
+  
 <h2>Also nehmen wir Datenbanken!</h2>
 
 <p>Mit Datenbanken sind hier relationale Datenbanksysteme gemeint. Hier betrachten wir:</p>
@@ -215,11 +178,7 @@ Außerdem gibt es generische Datenbankzugriffe über odbc und jdbc
 
 <slide class="" id="slide-6" style="background:;">
   <article data-timings="">
-    <!--
- The interface defines a small set of classes and methods similar 
- in spirit to Perl’s DBI, Java’s JDBC, Python’s DB-API, and Microsoft’s ODBC.
--->
-
+   
 <h2>DBI : library(DBI)</h2>
 
 <p>DBI ist eine generische S4-Bibliothek. Die Klassen und Methoden, die
@@ -245,7 +204,7 @@ zur Verfügung stehen, können von einer Vielzahl von Datenbanksystemen genutzt 
 </ul>
 
  '></article>
-  <!-- Presenter Notes -->
+ 
 </slide>
 
 <slide class="" id="slide-7" style="background:;">
@@ -294,10 +253,7 @@ system.time({
 
 <slide class="" id="slide-9" style="background:;">
   <article data-timings="">
-    <!--
-Was ist jetzt aus unserem bspdatensatz geworden?
-In Tabelle so definiert <pre>"REVISION_TAG" VARCHAR2(50 BYTE)</pre>.
--->
+  
 
 <h2>Beispielsdatensatz : aus Datenbank-Tabelle</h2>
 
@@ -328,17 +284,7 @@ str(data$REVISION_TAG)
 
 <slide class="" id="slide-10" style="background:;">
   <article data-timings="">
-    <!--
-dbDriver:
-These virtual classes and their methods define the interface to 
-database management systems (DBMS). They are extended by packages 
-or drivers that implement the methods in the context of specific DBMS
-(datenbank = databasemanagementsystem(dbms) + daten)
-(e.g., Berkeley DB, MySQL, Oracle, ODBC, PostgreSQL, SQLite).
-
-dbconnect:
-Connect to a DBMS going through the appropriate authorization procedure.
--->
+    
 
 <h2>PostgreSQL : library(RPostgreSQL)</h2>
 
@@ -385,23 +331,7 @@ system.time({
 
 <slide class="" id="slide-12" style="background:;">
   <article data-timings="">
-    <!--
-JDBC function has two purposes. One is to initialize the Java VM and load a Java 
-JDBC driver (not to be confused with the JDBCDriver R object which is 
-actually a DBI driver). 
-The second purpose is to create a proxy R object which can be used to a call 
-dbConnect which actually creates a connection.
-JDBC requires a JDBC driver for a database-backend to be loaded. 
-Usually a JDBC driver is supplied in a Java Archive (jar) file. 
-The path to such a file can be specified in classPath. The driver itself has a 
-Java class name that is used to load the driver (for example the MySQL driver 
-uses com.mysql.jdbc.Driver), this has to be specified in driverClass.
-Due to the fact that JDBC can talk to a wide variety of databases, 
-the SQL dialect understood by the database is not known in advance. 
-Therefore the RJDBC implementation tries to adhere to the SQL92 standard, 
-but not all databases are compliant. This affects mainly functions such as 
-dbWriteTable that have to automatically generate SQL code.
--->
+  
 
 <h2>Java Database Connectivity : library(RJDBC)</h2>
 
